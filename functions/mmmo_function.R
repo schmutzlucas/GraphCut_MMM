@@ -14,7 +14,7 @@ mmmo <- function(ref_present, ref_future, var_present, var_future) {
   weights <- quadprog::solve.QP(Dmat = Dmat/sc, dvec=d/sc, Amat=C, bvec=b, meq=0, factorized=FALSE)$solution
 
   var_mmmo <- apply(var_future, 1:2, weighted.mean, w = weights)
-  bias_mmmo <- var_mmmo - ref_future
+  bias_mmmo <- if(is.null(ref_future)) NULL else (var_mmmo - ref_future)
   bias_var_mmmo <- list("Var" = var_mmmo, "Bias" = bias_mmmo)
   return(bias_var_mmmo)
 }

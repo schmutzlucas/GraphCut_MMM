@@ -1,3 +1,6 @@
+library(ncdf4)
+library(ncdf4.helpers)
+
 source("functions/gc_function.R")
 source("functions/bias_var_function.R")
 source("functions/mmm_function.R")
@@ -5,22 +8,49 @@ source("functions/mmmo_function.R")
 source("functions/min_bias_function.R")
 
 # Variable utilisée : "tas" ou "pr"
-var <- "tas" 
+args = commandArgs(trailingOnly=TRUE)
+stopifnot(length(args) == 1)
+var = args[1]
+print(var)
 
 
-load("input/models_list.rdata")
-load(paste0("input/load_",var,"_cv.rdata")) # useless?
+year_present <- 1979:2008
+year_future <- 2071:2100
 
 # Names of models used in the ensemble
-model_names <- TAS_MODELS[c(1,3,4,5,7,8,11,12,13,16,17,20,22,24,26,30,31,33,34,37),2] 
+imodels <- c(
+  1, 2, 3, 4, 7,
+  8, 10, 12, 13, 14, 
+  17, 20, 22, 24, 26,
+  30, 31, 33, 34, 37
+)
 
+model_names <- readRDS("input/models_list.rds")[imodels, 2]
 
-ref <- get(paste0("tas_",model_names[[1]]))
-var_present <- var_future <- array(0,c(nrow = nrow(ref),ncol = ncol(ref),length(model_names)))
 for(i in 1:length(model_names)){
-  var_present[,,i] <- get(paste0(var,"_",model_names[[i]]))
-  var_future[,,i] <- get(paste0(var,"_",model_names[[i]],"_2100"))
+  print(model_names[i])
+  nc <- nc_open(paste0("netcdf/", var, "_", model_names[i], ".nc"))
+  if(i == 1) {
+    lat <- ncvar_get(nc, "lat")
+    lon <- ncvar_get(nc, "lon")
+    var_present <- var_future <- array(0,c(length(lon), length(lat), length(model_names)))
+  }
+  yyyy <- substr(as.character(nc.get.time.series(nc)), 1, 4)
+  iyyyy <- which(yyyy %in% year_present)
+  var_present[,,i] <- apply(
+    ncvar_get(nc, var, start = c(1, 1, min(iyyyy)), count = c(-1, -1, length(iyyyy))),
+    1:2, 
+    mean
+  )
+  iyyyy <- which(yyyy %in% year_future)
+  var_future[,,i] <- apply(
+    ncvar_get(nc, var, start = c(1, 1, min(iyyyy)), count = c(-1, -1, length(iyyyy))),
+    1:2, 
+    mean
+  )
+  nc_close(nc)
 }
+dimnames(var_future) <- dimnames(var_present) <- list(lon = lon, lat = lat, model = model_names)
 
 
 # List of label attribution matrices obtained with GraphCut
@@ -105,10 +135,10 @@ saveRDS(
 )
 saveRDS(
   var_present,
-  file = paste0("output/", var, "_var_present_cmip5.rds")
+  file = paste0("output/", var, "_var_present_perfectmodel.rds")
 )
 saveRDS(
   var_future,
-  file = paste0("output/", var, "_var_futur_cmip5.rds")
+  file = paste0("output/", var, "_var_futur_perfectmodel.rds")
 )
 

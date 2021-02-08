@@ -6,7 +6,7 @@ mmm <- function(ref, var) {
   
   # Preparing the data to perform the MMM
   var_mmm <- apply(var, 1:2, mean)
-  bias_mmm <- var_mmm - ref
+  bias_mmm <- if(is.null(ref)) NULL else (var_mmm - ref) 
   bias_var_mmm <- list("Var" = var_mmm, "Bias" = bias_mmm)
   
   return(bias_var_mmm)
