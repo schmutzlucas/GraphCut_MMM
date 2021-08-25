@@ -3,7 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-var="pr"
+var="$1"
 
 # Rscript  --vanilla  1_label_attribution_bias_var_gc.R $var
 Rscript  --vanilla  2_data_for_plots_perfect_model.R $var
