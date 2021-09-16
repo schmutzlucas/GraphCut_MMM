@@ -1,3 +1,6 @@
+# This functions takes a list of models and maps for each pixel the model with 
+# the least difference compared to a model of reference
+# returns the label attribution of the method "naive pixel perfect"
 min_bias <- function(ref, var){
   
   width <- ncol(ref) ### Number of longitudes
