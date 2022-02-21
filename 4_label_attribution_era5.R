@@ -54,6 +54,19 @@ dimnames(var_future) <- dimnames(var_present) <- list(lon = lon, lat = lat, mode
 
 # List of label attribution matrices obtained with GraphCut
 mmcombi <- list()
+
+##### Min bias #####
+minbias_result <- min_bias(
+  ref = var_present[,, 1],
+  var = var_present[,, -1]
+)
+minbias_bias_var <- bias_var(
+  ref_future = var_future[,, 1],
+  var_future = var_future[,, -1],
+  labeling = minbias_result
+  )
+mmcombi[["min_bias"]] <- c(minbias_bias_var, list("Label attribution" = minbias_result))
+
 #### GraphCut ####
 gc_result <- graphcut(
   ref.datacost = var_present[,, 1],
@@ -97,18 +110,6 @@ gc_bias_var <- bias_var(
 )
 mmcombi[["gc_future"]] <- c(gc_bias_var, gc_result)
 
-##### Min bias #####
-minbias_result <- min_bias(
-  ref = var_present[,, 1],
-  var = var_present[,, -1]
-)
-minbias_bias_var <- bias_var(
-  ref_future = var_future[,, 1],
-  var_future = var_future[,, -1],
-  labeling = minbias_result
-  )
-mmcombi[["min_bias"]] <- c(minbias_bias_var, list("Label attribution" = minbias_result))
-
 ##### MMM #####
 mmcombi[["mmm"]] <- mmm(
   ref = var_future[,, 1],
@@ -116,10 +117,16 @@ mmcombi[["mmm"]] <- mmm(
 )
 
 ##### MMM optimized #####
-mmcombi[["mmmo"]] <- mmmo(
+mmcombi[["om_present"]] <- mmmo(
   ref_present = var_present[,, 1],
   ref_future = var_future[,, 1],
   var_present = var_present[,, -1],
+  var_future = var_future[,, -1]
+)
+mmcombi[["om_future"]] <- mmmo(
+  ref_present = var_future[,, 1],
+  ref_future = var_future[,, 1],
+  var_present = var_future[,, -1],
   var_future = var_future[,, -1]
 )
 

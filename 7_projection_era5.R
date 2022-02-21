@@ -6,6 +6,7 @@ source("functions/bias_var_function.R")
 source("functions/mmm_function.R")
 source("functions/mmmo_function.R")
 source("functions/min_bias_function.R")
+source("functions/multimap.R")
 
 # Variable utilisée : "tas" ou "pr"
 args = commandArgs(trailingOnly=TRUE)
@@ -50,6 +51,19 @@ for(i in 1:length(model_names)){
 
 # List of label attribution matrices obtained with GraphCut
 mmcombi <- list()
+
+##### Min bias #####
+minbias_result <- min_bias(
+  ref = ref_present,
+  var = var_present
+)
+minbias_bias_var <- bias_var(
+  ref_future = NULL,
+  var_future = var_future,
+  labeling = minbias_result
+  )
+mmcombi[["min_bias"]] <- c(minbias_bias_var, list("Label attribution" = minbias_result))
+
 #### GraphCut ####
 gc_result <- graphcut(
   ref.datacost = ref_present,
@@ -79,17 +93,6 @@ gc_bias_var <- bias_var(
 )
 mmcombi[["gc_hybrid"]] <- c(gc_bias_var, gc_result)
 
-##### Min bias #####
-minbias_result <- min_bias(
-  ref = ref_present,
-  var = var_present
-)
-minbias_bias_var <- bias_var(
-  ref_future = NULL,
-  var_future = var_future,
-  labeling = minbias_result
-  )
-mmcombi[["min_bias"]] <- c(minbias_bias_var, list("Label attribution" = minbias_result))
 
 ##### MMM #####
 mmcombi[["mmm"]] <- mmm(
@@ -98,24 +101,37 @@ mmcombi[["mmm"]] <- mmm(
 )
 
 ##### MMM optimized #####
-mmcombi[["mmmo"]] <- mmmo(
+mmcombi[["om_present"]] <- mmmo(
   ref_present = ref_present,
   ref_future = NULL,
   var_present = var_present,
   var_future = var_future
 )
 
-
 saveRDS(
 mmcombi,
 file = paste0("output/", var, "_mmcombi_era5_proj.rds")
 )
 
+mmcombi <- mmcombi[c("min_bias", "mmm", "gc_hybrid", "om_present")]
 combi_names <- names(mmcombi)
-var_map <- 
+var_map_7100 <- 
   lapply(mmcombi, function(mmc){
     mmc$Var
   })
+
+mmcombi_0019 <- readRDS(paste0("output/", var, "_mmcombi_era5.rds"))
+var_map_0019 <- 
+  lapply(mmcombi_0019[combi_names], function(mmc){
+    mmc$Var
+  })
+
+var_map_diff <- mapply(
+  FUN = function(x, y) x-y,
+  x = var_map_7100,
+  y = var_map_0019,
+  SIMPLIFY = FALSE
+)
 
 ##### Maps #####
 colors <- c('#ffffcc','#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#bd0026','#800026')
@@ -128,8 +144,8 @@ ncolors <- length(colors)
 
 # Var projections
 
-pdf(paste0("figures/", var, "_var_map_era5_proj.pdf"))
-zlim <- range(unlist(var_map))
+pdf(paste0("figures/", var, "_var_map_era5_proj.pdf"), height = 2/3 * 7 + 1)
+zlim <- range(unlist(var_map_7100))
 zmin <- zlim[1]
 zmax <- zlim[2]
 if(var == "tas"){
@@ -139,22 +155,51 @@ if(var == "tas"){
   scale <- function(x) log(1 + x) / log(1 + zmax)
   unscale <- function(x) exp(x * log(1 + zmax)) - 1 
 }
-bias <- lapply(var_map, function(x) atan(x)/(pi/2)/zmax)
+maintitle <- sprintf(
+  "(%s) %s",
+  letters[seq.int(length(combi_names))],
+  combi_names
+)
+subtitle <- rep("", length(combi_names))
+lvalues <- lapply(var_map_7100, scale)
 zlim <- c(0, 1)
-breaks <- seq(0, 1, length.out = ncolors + 1)
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", unscale(breaks))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels,
+  outersplit = rbind(c(0, 1, 3/17, 1), c(0, 1, 0, 3/17)),
+  innersplit = c(2,2),
+  mai = c(0.6732, 0.5412, 0.5412, 0.2772),
+  legend_par = list(mar=c(8, 1, 1, 1), plt = c(0.1, 0.9, 0.9, 1))
+)
+dev.off()
 
-par(mfrow = c(3, 2))
-for(icombi in seq_along(var_map)){
-  var <- scale(var_map[[icombi]])
-  fields::image.plot(lon, lat, var,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             zlim = zlim,
-             col=colors,
-             breaks = breaks,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", unscale(breaks)), cex.axis = 0.5)
-  )
-  maps::map("world2",add=T)
-}
+##### Diff Maps #####
+pal_redwhiteblue <- c('#67001f','#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')
+colors <- rev(pal_redwhiteblue)
+ncolors <- length(colors)
+
+# Var evolution
+pdf(paste0("figures/", var, "_evo_map_era5_proj.pdf"), height = 2/3 * 7 + 1)
+zmax <- max(abs(unlist(var_map_diff)))
+scale <- function(x) x / zmax
+unscale <- function(x) x * zmax
+subtitle <- rep("", length(combi_names))
+lvalues <- lapply(var_map_diff, scale)
+zlim <- c(-1, 1)
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", unscale(breaks))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels,
+  outersplit = rbind(c(0, 1, 3/17, 1), c(0, 1, 0, 3/17)),
+  innersplit = c(2,2),
+  mai = c(0.6732, 0.5412, 0.5412, 0.2772),
+  legend_par = list(mar=c(8, 1, 1, 1), plt = c(0.1, 0.9, 0.9, 1))
+)
 dev.off()

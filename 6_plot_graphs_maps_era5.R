@@ -1,6 +1,9 @@
 library(fields)
 library(ncdf4)
 library(maps)
+library(magrittr)
+
+source("functions/multimap.R")
 
 args = commandArgs(trailingOnly=TRUE)
 stopifnot(length(args) == 1)
@@ -20,12 +23,21 @@ al_inv <- function(x) rrtofar(exp(tan((pi/2)*x)))
 rrtofar <- function(x) 1 - 1/x
 fartorr <- function(x) 1 /(1 - x) 
 
+atan_trans <- function(x, zmax = 1) atan(x)/ (pi/2) / zmax
+atan_inv <- function(x, zmax = 1) tan((pi/2) * x * zmax)
+
+pal_redwhiteblue <- c('#67001f','#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')
+pal_violetwhitegreen <- c('#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419')
+pal_whitered <- c('#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#d94801','#a63603','#7f2704')
+pal_whiteredblack <- c('#fff5f0','#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#000000')
+pal_whitepurple <- c('#fcfbfd','#efedf5','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#54278f','#3f007d')
+
 mmcombi <- readRDS(paste0("output/", var, "_mmcombi_era5.rds"))
 mae_bias <- readRDS(paste0("output/", var, "_mae_bias_era5.rds"))
 mae_bias_map <- readRDS(paste0("output/", var, "_mae_bias_map_era5.rds"))
 bias_map <- readRDS(paste0("output/", var, "_bias_map_era5.rds"))
-mse_gradient <- readRDS(paste0("output/", var, "_mse_gradient_era5.rds"))
-mse_gradient_map  <- readRDS(paste0("output/", var, "_mse_gradient_map_era5.rds"))
+mae_gradient <- readRDS(paste0("output/", var, "_mae_gradient_era5.rds"))
+mae_gradient_map  <- readRDS(paste0("output/", var, "_mae_gradient_map_era5.rds"))
 
 
 nc <- nc_open("netcdf/tas_era5.nc")
@@ -35,7 +47,7 @@ nc_close(nc)
 
 combi_names <- names(mae_bias)
 icombi_ref <- which(combi_names == "mmm")
-col_combi <- c("red", "darkolivegreen1", "blue", "purple", "grey", "black")
+col_combi <- c("red", "green", "blue", "purple", "grey48", "orange", "yellow")
 
 ##### MAE Bias #####
 
@@ -51,62 +63,58 @@ barplot(mae_bias,
 )
 
 dev.off()
-par(op)
 
-# MSE Gradient
+# MAE Gradient
 pdf(paste0("figures/", var, "_gradient_era5.pdf"))
 
-barplot(mse_gradient,  
+barplot(mae_gradient,  
      names.arg = combi_names,
      main="",
-     ylab="MSE_g",
+     ylab="MAE_g",
      col=col_combi
 )
 
 dev.off()
-par(op)
 
 
 
 
-##### Maps #####
 ##### Maps #####
 # Labels
+igc <- sapply(c("min_bias", "gc_present", "gc_hybrid", "gc_future"), function(x) which(x == names(mmcombi)))
+imaps <- sapply(c("min_bias", "mmm", "gc_hybrid", "om_present", "gc_future", "om_future"), function(x) which(x == names(mmcombi)))
+pdf(paste0("figures/", var, "_label_map_era5.pdf"))
+mae <- mae_bias[igc]
+maintitle <- sprintf(
+  "(%s) %s",
+    letters[seq.int(length(igc))],
+    names(mae)
+)
+subtitle <- rep("", length(igc))
+lvalues <- lapply(
+  mmcombi[igc],
+  function(x){
+    x <- x[["Label attribution"]] + 1
+    return(x)
+  }
+)
 colors <- rainbow(length(model_names)) 
 ncolors <- length(colors)
-breaks <- seq.int(0, ncolors)
-at <- breaks[-1] - 0.5
-igc <- which(names(mmcombi) %in% c("gc_present", "gc_hybrid", "gc_future", "min_bias"))
-pdf(paste0("figures/", var, "_label_map_era5.pdf"))
-set.panel() # reset plotting device
-iouter <- split.screen(rbind(c(0, 1, 0.2, 1), c(0, 1, 0, 0.25)))
-iinner <- split.screen(c(2,2), screen= iouter[1])
-for(icombi in seq_along(igc)){
-  screen(iinner[icombi])
-  image(
-    lon, lat, mmcombi[[igc[icombi]]][["Label attribution"]],
-    xlab = '',
-    ylab = '',
-    main = names(mmcombi)[igc[icombi]],
-    col= colors
-  )
-  map("world2",add=T)
-}
-screen(iouter[2])
-oldpar <- par(mar=c(8, 1, 1, 1), plt = c(0.1, 0.9, 0.9, 1))
-image(
-  x = at,
-  y = 1:2, 
-  z = matrix(at, ncol = 1),
-  col = colors,
-  breaks = breaks,
-  xaxt = "n", yaxt = "n", xlab = "", ylab = ""
+breaks <- seq.int(ncolors + 1) - 0.5
+zlim <- range(breaks)
+labels <- model_names
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels,
+  outersplit = rbind(c(0, 1, 0.33, 1), c(0, 1, 0, 0.33)), 
+  innersplit = c(2,2),
+  mai = c(0.6732, 0.5412, 0.5412, 0.2772),
+  legend_par = list(mar=c(8, 1, 1, 1), plt = c(0.1, 0.9, 0.9, 1))
 )
-axis(1, at = at, labels = model_names, las = 3)
-mtext("labels", side = 3)
-close.screen(all=TRUE)
-par(oldpar)
 dev.off()
+
 
 # Label frequency
 freq <- matrix(0, nrow = length(model_names), ncol = length(igc))
@@ -117,127 +125,154 @@ for(icombi in seq_along(igc)){
   labels <- mmcombi[[igc[icombi]]][["Label attribution"]] + 1
   count <- table(model_names[labels])
   freq[names(count), igc[icombi]] <- count / sum(count)
-  barplot(freq[, igc[icombi]], main = names(mae_bias)[igc[icombi]], xlab="", ylim= c(0, max(freq)), las=2)
+}
+for(icombi in seq_along(igc)){
+  barplot(
+    freq[, igc[icombi]],
+    main = paste0("(", letters[icombi], ") ", names(mae_bias)[igc[icombi]]),
+    xlab="", ylim= c(0, max(freq)),
+    las=2
+  )
 }
 dev.off()
 
-colors <- c('#ffffcc','#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#e31a1c','#bd0026','#800026')
-colors <- c('#67001f','#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')
-ncolors <- length(colors)
 # MAE bias
 
-pdf(paste0("figures/", var, "_bias_map_era5.pdf"))
-zmax <- max(abs(atan(unlist(bias_map))/(pi/2)))
+pdf(paste0("figures/", var, "_bias_map_era5.pdf"), height = 8)
+colors <- if(var == "tas") rev(pal_redwhiteblue) else pal_redwhiteblue
+ncolors <- length(colors)
+mae <- mae_bias[imaps]
+maintitle <- sprintf(
+  "(%s) %s",
+  letters[seq.int(length(imaps))],
+  names(mae)
+)
+subtitle <- sprintf("MAE_b = %.2f ", mae)
+lvalues <- lapply(bias_map[imaps], atan_trans)
+zmax <- unlist(lvalues) %>% abs %>% max
+lvalues <- lapply(lvalues, "/", y = zmax)
 zlim <- c(-1, 1)
-breaks <- seq(-1, 1, length.out = ncolors + 1)
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", atan_inv(breaks, zmax))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels
+)
+dev.off()
+
+pdf(paste0("figures/", var, "_bias_hist_era5.pdf"), height = 8)
+xrange <- range(sapply(bias_map[imaps], range))
+breaks <- seq(xrange[1], xrange[2], length.out = 41)
+lhist <- lapply(bias_map[imaps], hist, breaks = breaks, plot = FALSE)
+ymax <- max(sapply(lhist, function(h) max(h$count))) * 1.1
 par(mfrow = c(3, 2))
-for(icombi in seq_along(bias_map)){
-  bias <- atan(bias_map[[icombi]]) / (pi/2) / zmax
-  image.plot(lon, lat, bias,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             sub = sprintf("MAE_b = %.2f ", mae_bias[icombi]),
-             zlim = zlim,
-             col=colors,
-             breaks = breaks,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", tan(breaks * zmax * (pi/2))), cex.axis = 0.5)
-  )
-  map("world2",add=T)
+for (i in seq_along(imaps)) {
+    hist(
+        bias_map[[imaps[i]]],
+        breaks = breaks, ylim = c(0, ymax), col = "grey",
+        xlab = "", main = maintitle[i], sub = subtitle[i]
+    )
 }
 dev.off()
 
-colors <- c('#fff5eb','#fee6ce','#fdd0a2','#fdae6b','#fd8d3c','#f16913','#d94801','#a63603','#7f2704')
+
+pdf(paste0("figures/", var, "_mae_bias_map_era5.pdf"), height = 8)
+colors <- pal_whitered
 ncolors <- length(colors)
-pdf(paste0("figures/", var, "_mae_bias_map_era5.pdf"))
-# zlim <- max(abs(range(unlist(mae_bias_map[[imodel]])))) * c(-1, 1)
-zmax <- max(abs(atan(unlist(mae_bias_map))/(pi/2)))
+lvalues <- lapply(mae_bias_map[imaps], atan_trans)
+zmax <- unlist(lvalues) %>% abs %>% max
+lvalues <- lapply(lvalues, "/", y = zmax)
 zlim <- c(0, 1)
-breaks <- seq(0, 1, length.out = ncolors + 1)
-par(mfrow = c(3, 2))
-for(icombi in seq_along(mae_bias_map)){
-  mae <- atan(mae_bias_map[[icombi]]) / (pi/2) / zmax
-  image.plot(lon, lat, mae,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             sub = sprintf("MAE_b = %.2f ", mae_bias[icombi]),
-             zlim = zlim,
-             col=colors,
-             breaks = breaks,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", tan(breaks * zmax * (pi/2))), cex.axis = 0.5)
-  )
-  map("world2",add=T)
-}
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", atan_inv(breaks, zmax))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels
+)
 dev.off()
 
 # MAE bias Skill Score
-colors <- c('#9e0142','#d53e4f','#f46d43','#fdae61','#fee08b','#ffffbf','#e6f598','#abdda4','#66c2a5','#3288bd','#5e4fa2')
-ncolors <- length(colors)
-pdf(paste0("figures/", var, "_mae_bias_skillscore_map_era5.pdf"))
+pdf(paste0("figures/", var, "_mae_bias_diff_map_era5.pdf"), height = 8)
+lvalues <- lapply(
+  mae_bias_map[imaps], 
+  function(x) atan_trans(x - mae_bias_map[[icombi_ref]])
+)
+zmax <- unlist(lvalues) %>% abs %>% max
+lvalues <- lapply(lvalues, "/", y = zmax)
 zlim <- c(-1, 1)
-breaks <- seq(-1, 1, length.out = ncolors + 1)
-par(mfrow = c(3, 2))
-for(icombi in seq_along(mae_bias_map)){
-  skill <-  al_trans(1 - mae_bias_map[[icombi]] / mae_bias_map[[icombi_ref]])
-  image.plot(lon, lat, skill,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             sub = sprintf("MAE_b = %.2f ", mae_bias[icombi]),
-             zlim = zlim,
-             col = colors,
-             breaks = breaks,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", al_inv(breaks)), cex.axis = 0.5)
-  )
-  map("world2",add=T)
-}
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", atan_inv(breaks, zmax))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels
+)
 dev.off()
 
-# MSE gradient
-colors <- rev(viridis::viridis(11))
-colors <- c('#fcfbfd','#efedf5','#dadaeb','#bcbddc','#9e9ac8','#807dba','#6a51a3','#54278f','#3f007d')
+# MAE gradient
+pdf(paste0("figures/", var, "_mae_gradient_map_era5.pdf"), height = 8)
+colors <- pal_whiteredblack
 ncolors <- length(colors)
-pdf(paste0("figures/", var, "_mse_gradient_map_era5.pdf"))
-zmax <- max(abs(atan(unlist(mse_gradient_map))/(pi/2)))
+mae <- mae_gradient[imaps]
+maintitle <- sprintf(
+  "(%s) %s",
+  letters[seq.int(length(imaps))],
+  names(mae)
+)
+subtitle <- sprintf("MAE_g = %.2f ", mae)
+lvalues <- lapply(mae_gradient_map[imaps], atan_trans)
+zmax <- unlist(lvalues) %>% abs %>% max
+lvalues <- lapply(lvalues, "/", y = zmax)
 zlim <- c(0, 1)
-breaks <- seq(0, 1, length.out = ncolors + 1)
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", atan_inv(breaks, zmax))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels
+)
+dev.off()
+
+
+pdf(paste0("figures/", var, "_mae_gradient_hist_era5.pdf"), height = 8)
+xrange <- range(sapply(mae_gradient_map[imaps], range))
+breaks <- seq(xrange[1], xrange[2], length.out = 41)
+lhist <- lapply(mae_gradient_map[imaps], hist, breaks = breaks, plot = FALSE)
+ymax <- max(sapply(lhist, function(h) max(h$count))) * 1.1
 par(mfrow = c(3, 2))
-for(icombi in seq_along(mse_gradient_map)){
-  mse <- atan(mse_gradient_map[[icombi]]) / (pi/2) / zmax
-  image.plot(lon, lat, mse,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             sub = sprintf("MAE_g = %.2f ", mse_gradient[icombi]),
-             zlim = zlim,
-             breaks = breaks,
-             col = colors,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", tan(breaks * zmax * (pi/2))), cex.axis = 0.5)
-  )
-  map("world2",add=T)
+for (i in seq_along(imaps)) {
+    hist(
+        mae_gradient_map[[imaps[i]]],
+        breaks = breaks, ylim = c(0, ymax), col = "grey",
+        xlab = "", main = maintitle[i], sub = subtitle[i]
+    )
 }
 dev.off()
 
-# MSE gradient Skill Score
-colors <- c('#9e0142','#d53e4f','#f46d43','#fdae61','#fee08b','#ffffbf','#e6f598','#abdda4','#66c2a5','#3288bd','#5e4fa2')
+
+# MAE gradient Skill Score
+pdf(paste0("figures/", var, "_mae_gradient_diff_map_era5.pdf"), height = 8)
+colors <- rev(pal_violetwhitegreen)
 ncolors <- length(colors)
-pdf(paste0("figures/", var, "_mse_gradient_skillscore_map_era5.pdf"))
+lvalues <- lapply(
+  mae_gradient_map[imaps], 
+  function(x) atan_trans(x - mae_gradient_map[[icombi_ref]])
+)
+zmax <- unlist(lvalues) %>% abs %>% max
+lvalues <- lapply(lvalues, "/", y = zmax)
 zlim <- c(-1, 1)
-breaks <- seq(-1, 1, length.out = ncolors + 1)
-par(mfrow = c(3, 2))
-for(icombi in seq_along(mse_gradient_map)){
-  skill <-  al_trans(1 - mse_gradient_map[[icombi]] / mse_gradient_map[[icombi_ref]])
-  image.plot(lon, lat, skill,
-             xlab = '',
-             ylab = '',
-             main = combi_names[icombi],
-             sub = sprintf("MAE_b = %.2f ", mse_gradient[icombi]),
-             zlim = zlim,
-             col = colors,
-             breaks = breaks,
-             axis.args = list(at=breaks, labels = sprintf("%.2f", al_inv(breaks)), cex.axis = 0.5)
-  )
-  map("world2",add=T)
-}
+breaks <- seq(zlim[1], zlim[2], length.out = length(colors) + 1)
+labels <- sprintf("%.2f", atan_inv(breaks, zmax))
+multimap(
+  lon, lat, lvalues,
+  maintitle, subtitle,
+  zlim, colors,
+  breaks, labels
+)
 dev.off()
