@@ -12,7 +12,6 @@
     iouter <- split.screen(outersplit)
     iinner <- split.screen(innersplit, screen = iouter[1])
     ncolors <- length(colors)
-    worldmap <-  maps::map(wrap = c(0,360), plot=TRUE, add=TRUE)
     for(icombi in seq_along(lvalues)){
       screen(iinner[icombi])
       par(mai = mai)
@@ -27,7 +26,7 @@
         # axis.args = list(at=breaks, labels = sprintf("%.2f", atan_inv(breaks, zmax)), cex.axis = 0.5)
       )
       mtext(sub[icombi], side = 1, line = 2)
-      lines(worldmap)
+      maps::map("world2", add=T)
     }
     screen(iouter[2])
     par(legend_par)

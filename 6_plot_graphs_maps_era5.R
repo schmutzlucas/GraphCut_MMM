@@ -255,7 +255,6 @@ for (i in seq_along(imaps)) {
 }
 dev.off()
 
-
 # MAE gradient Skill Score
 pdf(paste0("figures/", var, "_mae_gradient_diff_map_era5.pdf"), height = 8)
 colors <- rev(pal_violetwhitegreen)
