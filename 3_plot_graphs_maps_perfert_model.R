@@ -47,8 +47,13 @@ nc_close(nc)
 
 
 opt <- options("scipen" = 3)
+<<<<<<< HEAD
+pdf(paste0("figures/", var, "_bias_perfectmodel.pdf"), width = 9)
+par(mar = c(6.1, 6.1, 4.1, 8.1), mgp = c(5, 1, 0))
+=======
 pdf(paste0("figures/", var, "_bias_perfectmodel.pdf"))
 par(mar = c(6.1, 6.1, 4.1, 2.1), mgp = c(5, 1, 0))
+>>>>>>> dfee4809dbf5fef46729f8272b5ecbd0c5d1fb53
 xlim <- c(1, length(model_names) - 1 + nrow(mae_bias)/2 + .5)
 plot(
   NA,  
@@ -116,6 +121,16 @@ mtext(
   at = length(model_names)
 )
 
+<<<<<<< HEAD
+legend(xlim[2] + 2, max(range(mae_bias)),  xpd = TRUE, 
+       legend = rownames(mae_gradient), bty = "n",
+       col = col_combi, pt.bg = col_combi, pch = pch_combi, cex=0.8, bg = "white") 
+dev.off()
+
+# MAE Gradient
+pdf(paste0("figures/", var, "_gradient_perfectmodel.pdf"), width = 9)
+par(mar = c(6.1, 6.1, 4.1, 8.1), mgp = c(5, 1, 0))
+=======
 legend("topright", legend = rownames(mae_gradient),
        col = col_combi, pt.bg = col_combi, pch = pch_combi, cex=0.8, bg = "white")
 
@@ -124,6 +139,7 @@ dev.off()
 # MAE Gradient
 pdf(paste0("figures/", var, "_gradient_perfectmodel.pdf"))
 par(mar = c(6.1, 6.1, 4.1, 2.1), mgp = c(5, 1, 0))
+>>>>>>> dfee4809dbf5fef46729f8272b5ecbd0c5d1fb53
 
 plot(NA,  
      xlim=xlim,
@@ -186,7 +202,8 @@ mtext(
   at = length(model_names)
 )
 
-legend("topright", legend = rownames(mae_gradient),
+legend(xlim[2] + 2, max(range(mae_gradient)),  xpd = TRUE, 
+       legend = rownames(mae_gradient), bty = "n",
        col = col_combi, pt.bg = col_combi, pch = pch_combi, cex=0.8, bg = "white")
 
 dev.off()

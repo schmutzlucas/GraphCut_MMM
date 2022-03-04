@@ -162,6 +162,22 @@ multimap(
 )
 dev.off()
 
+pdf(paste0("figures/", var, "_bias_hist_era5.pdf"), height = 8)
+xrange <- range(sapply(bias_map[imaps], range))
+breaks <- seq(xrange[1], xrange[2], length.out = 41)
+lhist <- lapply(bias_map[imaps], hist, breaks = breaks, plot = FALSE)
+ymax <- max(sapply(lhist, function(h) max(h$count))) * 1.1
+par(mfrow = c(3, 2))
+for (i in seq_along(imaps)) {
+    hist(
+        bias_map[[imaps[i]]],
+        breaks = breaks, ylim = c(0, ymax), col = "grey",
+        xlab = "", main = maintitle[i], sub = subtitle[i]
+    )
+}
+dev.off()
+
+
 pdf(paste0("figures/", var, "_mae_bias_map_era5.pdf"), height = 8)
 colors <- pal_whitered
 ncolors <- length(colors)
@@ -221,6 +237,22 @@ multimap(
   zlim, colors,
   breaks, labels
 )
+dev.off()
+
+
+pdf(paste0("figures/", var, "_mae_gradient_hist_era5.pdf"), height = 8)
+xrange <- range(sapply(mae_gradient_map[imaps], range))
+breaks <- seq(xrange[1], xrange[2], length.out = 41)
+lhist <- lapply(mae_gradient_map[imaps], hist, breaks = breaks, plot = FALSE)
+ymax <- max(sapply(lhist, function(h) max(h$count))) * 1.1
+par(mfrow = c(3, 2))
+for (i in seq_along(imaps)) {
+    hist(
+        mae_gradient_map[[imaps[i]]],
+        breaks = breaks, ylim = c(0, ymax), col = "grey",
+        xlab = "", main = maintitle[i], sub = subtitle[i]
+    )
+}
 dev.off()
 
 # MAE gradient Skill Score
